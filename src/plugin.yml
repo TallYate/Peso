@@ -1,0 +1,26 @@
+main: me.joshua.peso.Main
+name: Pesos
+author: Joshua
+version: 1.0
+description: adds pesos
+api-version: 1.16
+commands:
+   peso:
+      aliases:
+      - eco
+      description: peso stuff
+   withdraw:
+      aliases:
+      - w
+      - take
+      description: get money in item form
+   deposit:
+      aliases:
+      - d
+      - put
+      description: turn item money into money
+   balance:
+      aliases:
+      - bal
+      - b
+      description: check how much money you have
