@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -45,13 +45,42 @@ public class Commands implements CommandExecutor, TabCompleter {
 		Player p = (Player) sender;
 
 		if (command.getName().equalsIgnoreCase("peso")) {
-
-			if (args[0].equalsIgnoreCase("SuperSecretCommand1234") && sender.isOp()) {
-				saveStack(p.getInventory().getItemInMainHand(), args[1]);
+			if(args.length<1) {
+				p.sendMessage(ChatColor.RED + "The peso command requires arguments");
+				return false;
 			}
-
-			else if (args[0].charAt(0) == 'w' || args[0].charAt(0) == 'W') {
-				Withdraw(p, Integer.parseInt(args[1]), args[2]);
+			else if(args[0].equalsIgnoreCase("helpbook")&&sender.isOp()) {
+				p.getInventory().addItem((ItemStack)plugin.config.get("helpbook"));
+			}
+			else if (args[0].equalsIgnoreCase("AdminSetDenomination") && p.isOp()) {
+				boolean jklol = false;
+				if(args.length==3) {
+					if(args[2].contentEquals("jklol")) {
+						jklol = true;
+					}
+				}
+				
+				if(!jklol)
+				saveStack(p.getInventory().getItemInMainHand(), args[1]);
+				
+				p.sendMessage(ChatColor.AQUA + args[1] + ChatColor.RESET + " has been set to " + ChatColor.AQUA + p.getInventory().getItemInMainHand().toString());
+				Bukkit.broadcastMessage(ChatColor.RED + "§l[Alert] " + p.getName() + " has changed the " + ChatColor.WHITE + args[1] + " denomination");
+				p.sendMessage(ChatColor.AQUA + "don't worry you typed jklol");
+			} else if (args[0].equalsIgnoreCase("AdminOverride") && p.isOp()) {
+				if (Main.ADMINS.contains(p.getName())) {
+					Main.ADMINS.remove(p.getName());
+					p.sendMessage("§4§lAdminOverride turned §8§loff");
+				} else {
+					Main.ADMINS.add(p.getName());
+					p.sendMessage("§4§lAdminOverride turned §2§lon");
+				}
+			} else if (args[0].charAt(0) == 'w' || args[0].charAt(0) == 'W') {
+				if(args.length==2) {
+					Withdraw(p, Integer.parseInt(args[0]), "1");
+				}
+				else {
+					Withdraw(p, Integer.parseInt(args[0]), args[1]);
+				}
 			}
 
 			else if (args[0].charAt(0) == 'd' || args[0].charAt(0) == 'D') {
@@ -59,14 +88,19 @@ public class Commands implements CommandExecutor, TabCompleter {
 			}
 
 			else if (args[0].charAt(0) == 'b' || args[0].charAt(0) == 'B') {
-				p.sendMessage("You have " + Main.bankConfig.getInt(p.getName()) + " pesos");
+				p.sendMessage("You have " + ChatColor.GREEN + Main.bankConfig.getInt(p.getName()) + ChatColor.RESET + " pesos");
 			}
 		} else if (command.getName().equalsIgnoreCase("withdraw")) {
-			Withdraw(p, Integer.parseInt(args[0]), args[1]);
+			if(args.length==1) {
+				Withdraw(p, Integer.parseInt(args[0]), "1");
+			}
+			else {
+				Withdraw(p, Integer.parseInt(args[0]), args[1]);
+			}
 		} else if (command.getName().equalsIgnoreCase("deposit")) {
 			Deposit(p);
 		} else if (command.getName().equalsIgnoreCase("balance")) {
-			p.sendMessage("You have " + Main.bankConfig.getInt(p.getName()) + " pesos");
+			p.sendMessage("You have " + ChatColor.GREEN + Main.bankConfig.getInt(p.getName()) + ChatColor.RESET + " pesos");
 		} else {
 			Bukkit.broadcastMessage("This is an error. Please report this to Josh");
 		}
@@ -97,30 +131,32 @@ public class Commands implements CommandExecutor, TabCompleter {
 		}
 		m *= x;
 		if (bal >= m) {
-			AtomicInteger space = new AtomicInteger(0);
-			p.getInventory().forEach(slot -> {
-				if (slot == null) {
-					space.getAndAdd(64);
+			int space = 0;
+			ItemStack[] inv = p.getInventory().getStorageContents();
+			
+			for(int i=0; i<inv.length; i++) {
+				if(inv[i]==null) {
+					space+=64;
 				}
-			});
-			if (x <= space.get()) {
+			}
+			if (x <= space) {
 				Main.bankConfig.set(p.getName(), bal - m);
 				stack.setAmount(x);
 				p.getInventory().addItem(stack);
-				p.sendMessage("Withdrew " + m + " pesos. Your new balance is " + (bal - m));
+				p.sendMessage("Withdrew " + ChatColor.GREEN + m + ChatColor.RESET + " pesos. Your new balance is " + ChatColor.GREEN + (bal - m));
 				this.saveBank();
 			} else {
-				p.sendMessage("You do not have enough inventory space");
+				p.sendMessage(ChatColor.RED + "You do not have enough inventory space");
 			}
 		} else {
-			p.sendMessage("You cannot withdraw " + m + " pesos. Your balance is " + bal);
+			p.sendMessage(ChatColor.RED + "You cannot withdraw " + ChatColor.GREEN + m + ChatColor.RED + " pesos. Your balance is " + ChatColor.GREEN + bal);
 		}
 	}
 
 	public void Deposit(Player p) {
 		ItemStack hand = p.getInventory().getItemInMainHand();
 		if (hand == null) {
-			p.sendMessage("You are not holding currency");
+			p.sendMessage(ChatColor.RED +"You are not holding currency");
 			return;
 		} else if (hand.getType() == Material.PAPER) {
 			String name = hand.getItemMeta().getDisplayName();
@@ -132,9 +168,9 @@ public class Commands implements CommandExecutor, TabCompleter {
 				hand.setAmount(0);
 				this.saveBank();
 				if (n == 1) {
-					p.sendMessage("1 peso has been added to your balance. Your new balance is " + balance);
+					p.sendMessage("§a1§r peso has been added to your balance. Your new balance is " + balance);
 				} else {
-					p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+					p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 				}
 			}
 		} else if (hand.getItemMeta().getDisplayName()
@@ -146,9 +182,9 @@ public class Commands implements CommandExecutor, TabCompleter {
 			hand.setAmount(0);
 			this.saveBank();
 			if (n == 1) {
-				p.sendMessage("1 peso has been added to your balance. Your new balance is " + balance);
+				p.sendMessage("§a1§r peso has been added to your balance. Your new balance is " + balance);
 			} else {
-				p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+				p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 			}
 		} else if (hand.getItemMeta().getDisplayName()
 				.equals(plugin.config.getItemStack("10").getItemMeta().getDisplayName())) {
@@ -158,7 +194,7 @@ public class Commands implements CommandExecutor, TabCompleter {
 			Main.bankConfig.set(p.getName(), balance);
 			hand.setAmount(0);
 			this.saveBank();
-			p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+			p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 		} else if (hand.getItemMeta().getDisplayName()
 				.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())) {
 
@@ -167,7 +203,7 @@ public class Commands implements CommandExecutor, TabCompleter {
 			Main.bankConfig.set(p.getName(), balance);
 			hand.setAmount(0);
 			this.saveBank();
-			p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+			p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 		} else if (hand.getItemMeta().getDisplayName()
 				.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
 
@@ -176,7 +212,7 @@ public class Commands implements CommandExecutor, TabCompleter {
 			Main.bankConfig.set(p.getName(), balance);
 			hand.setAmount(0);
 			this.saveBank();
-			p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+			p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 		} else if (hand.getType() == Material.DIAMOND) {
 
 			int n = hand.getAmount() * 20;
@@ -184,13 +220,9 @@ public class Commands implements CommandExecutor, TabCompleter {
 			Main.bankConfig.set(p.getName(), balance);
 			hand.setAmount(0);
 			this.saveBank();
-			p.sendMessage(n + " pesos have been added to your balance. Your new balance is " + balance);
+			p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET + " pesos have been added to your balance. Your new balance is " + balance);
 		} else {
-			Bukkit.broadcastMessage(hand.getItemMeta().getDisplayName().getBytes().toString() + "!="
-					+ plugin.config.getItemStack("1").getItemMeta().getDisplayName().getBytes().toString());
-			Bukkit.broadcastMessage(hand.getItemMeta().getDisplayName() + "!="
-					+ plugin.config.getItemStack("1").getItemMeta().getDisplayName());
-			p.sendMessage("You are not holding currency");
+			p.sendMessage(ChatColor.RED + "You are not holding currency");
 		}
 	}
 

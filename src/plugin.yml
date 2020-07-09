@@ -1,14 +1,14 @@
 main: me.joshua.peso.Main
 name: Pesos
 author: Joshua
-version: 1.0
+version: 2.0
 description: adds pesos
 api-version: 1.16
 commands:
    peso:
       aliases:
       - eco
-      description: peso stuff
+      description: /help pesos for commands
    withdraw:
       aliases:
       - w
