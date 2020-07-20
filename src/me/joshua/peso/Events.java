@@ -16,13 +16,14 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-public class PesoShop implements Listener {
+public class Events implements Listener {
 	private Main plugin;
 
-	public PesoShop(Main pluginIn) {
+	public Events(Main pluginIn) {
 		plugin = pluginIn;
 		Bukkit.getPluginManager().registerEvents(this, plugin);
 	}
@@ -225,7 +226,39 @@ public class PesoShop implements Listener {
 					plugin.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
 					plugin.saveShops();
 				}
+			} else {
+				String name = meta.getDisplayName();
+				if (name.equals(plugin.config.getItemStack("1").getItemMeta().getDisplayName())
+						|| name.equals(plugin.config.getItemStack("10").getItemMeta().getDisplayName())
+						|| name.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())
+						|| name.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
+					e.setCancelled(true);
+				}
 			}
+		}
+
+	}
+
+	@EventHandler
+	public void onAnvil(PrepareAnvilEvent event) {
+		ItemStack stack = event.getInventory().getContents()[0];
+		if (stack == null) {
+			return;
+		}
+		if (!stack.hasItemMeta()) {
+			return;
+		}
+		ItemMeta meta = stack.getItemMeta();
+		if (!meta.hasDisplayName()) {
+			return;
+		}
+		String name = meta.getDisplayName();
+		if ((stack.getType() == Material.PAPER && name.substring(0, 2).equals("§l"))
+				|| name.equals(plugin.config.getItemStack("1").getItemMeta().getDisplayName())
+				|| name.equals(plugin.config.getItemStack("10").getItemMeta().getDisplayName())
+				|| name.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())
+				|| name.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
+			event.setResult(null);
 		}
 	}
 

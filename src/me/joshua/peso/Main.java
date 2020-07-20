@@ -33,7 +33,7 @@ public class Main extends JavaPlugin {
 		createShops();
 		adminBar();
 		new Commands(this);
-		new PesoShop(this);
+		new Events(this);
 	}
 
 	public void adminBar() {

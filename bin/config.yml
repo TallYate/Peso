@@ -2,7 +2,6 @@
   ==: org.bukkit.inventory.ItemStack
   v: 2567
   type: PLAYER_HEAD
-  amount: 17
   meta:
     ==: ItemMeta
     meta-type: SKULL

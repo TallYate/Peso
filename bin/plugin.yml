@@ -1,7 +1,7 @@
 main: me.joshua.peso.Main
 name: Pesos
 author: Joshua
-version: 3.3
+version: 3.4
 description: adds pesos
 api-version: 1.16
 commands:
