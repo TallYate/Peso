@@ -18,14 +18,13 @@ import net.md_5.bungee.api.chat.TextComponent;
 
 public class Main extends JavaPlugin {
 	public FileConfiguration config = this.getConfig();
-	public static File bankFile;
-	public static FileConfiguration bankConfig;
+	public File bankFile;
+	public FileConfiguration bankConfig;
 
-	public static File shopFile;
-	public static FileConfiguration shopConfig;
+	public File shopFile;
+	public FileConfiguration shopConfig;
 
-	public static String OVERRIDE = "pesoAdminOverride";
-	public static List<String> ADMINS = new Vector<String>();
+	public List<String> ADMINS = new Vector<String>();
 
 	public void onEnable() {
 		this.saveDefaultConfig();
@@ -64,6 +63,14 @@ public class Main extends JavaPlugin {
 			e.printStackTrace();
 		}
 	}
+	
+	public void saveBank() {
+		try {
+			bankConfig.save(bankFile);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	private void createShops() {
 		shopFile = new File(getDataFolder(), "shops.yml");
@@ -80,7 +87,7 @@ public class Main extends JavaPlugin {
 		}
 	}
 
-	public static void saveShops() {
+	public void saveShops() {
 		try {
 			shopConfig.save(shopFile);
 		} catch (IOException e) {

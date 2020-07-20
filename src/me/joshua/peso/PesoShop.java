@@ -19,32 +19,34 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-
 public class PesoShop implements Listener {
-	private static Main plugin;
+	private Main plugin;
 
 	public PesoShop(Main pluginIn) {
 		plugin = pluginIn;
-
 		Bukkit.getPluginManager().registerEvents(this, plugin);
 	}
 
 	@EventHandler
-	public static void onClick(InventoryClickEvent e) {
+	public void onClick(InventoryClickEvent e) {
 		if (e.getSlot() < 0) {
 			return;
 		}
 
-		if (Main.ADMINS.contains(e.getWhoClicked().getName())) {
+		if (plugin.ADMINS.contains(e.getWhoClicked().getName())) {
+			return;
+		}
+
+		if (e.getInventory().getLocation() == null) {
 			return;
 		}
 
 		String loc = Shop.getLoc(e.getClickedInventory().getLocation());
 		if (e.getClickedInventory().getType() == InventoryType.CHEST) {
-			if (Main.shopConfig.contains(loc)) {
+			if (plugin.shopConfig.contains(loc)) {
 				Player p = (Player) e.getWhoClicked();
-				Shop shop = (Shop) Main.shopConfig.get(loc);
-				int money = Main.bankConfig.getInt(p.getName());
+				Shop shop = (Shop) plugin.shopConfig.get(loc);
+				int money = plugin.bankConfig.getInt(p.getName());
 				if (!p.getName().equals(shop.owner)) {
 					if (e.getWhoClicked() instanceof Player) {
 						boolean flag = true;
@@ -77,30 +79,36 @@ public class PesoShop implements Listener {
 							} else {
 								p.getInventory().addItem(e.getCurrentItem());
 								ItemStack current = e.getCurrentItem();
-								if (current==null) {
+								if (current.getType() == Material.AIR) {
 									return;
 								}
 								e.setCurrentItem(cheque);
-								Main.bankConfig.set(p.getName(), money - shop.price);
+								plugin.bankConfig.set(p.getName(), money - shop.price);
 								Bukkit.getScheduler().runTask(plugin, task -> {
 									p.closeInventory();
 									if (current.hasItemMeta()) {
-										p.sendMessage("You purchased " + current.getItemMeta().getDisplayName() + ChatColor.BLUE + " x" +  current.getAmount() + " for "
-												+ ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from " + ChatColor.GOLD +  shop.owner);
+										p.sendMessage("You purchased " + current.getItemMeta().getDisplayName()
+												+ ChatColor.BLUE + " x" + current.getAmount() + " for "
+												+ ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
+												+ ChatColor.GOLD + shop.owner);
 									} else {
-										p.sendMessage("You purchased "  + current.getType().toString() + ChatColor.BLUE + " x" +  current.getAmount() + ChatColor.RESET +  " for "
-												+ ChatColor.GREEN+ shop.price + ChatColor.RESET + " pesos from " + ChatColor.GOLD +  shop.owner);
+										p.sendMessage("You purchased " + current.getType().toString() + ChatColor.BLUE
+												+ " x" + current.getAmount() + ChatColor.RESET + " for "
+												+ ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
+												+ ChatColor.GOLD + shop.owner);
 									}
 
-									p.sendMessage(
-											"Your new balance is " + ChatColor.GREEN+  Main.bankConfig.getInt(p.getName()) +ChatColor.RESET+ " pesos");
+									p.sendMessage("Your new balance is " + ChatColor.GREEN
+											+ plugin.bankConfig.getInt(p.getName()) + ChatColor.RESET + " pesos");
+									plugin.saveBank();
 								});
 							}
 						} else {
 							Bukkit.getScheduler().runTask(plugin, task -> {
-								if(e.getCurrentItem()!=null) {
+								if (e.getCurrentItem().getType() != Material.AIR) {
 									p.closeInventory();
-									p.sendMessage(ChatColor.RED + "You do not have " + ChatColor.GREEN + shop.price + ChatColor.RED + " pesos");
+									p.sendMessage(ChatColor.RED + "You do not have " + ChatColor.GREEN + shop.price
+											+ ChatColor.RED + " pesos");
 								}
 							});
 						}
@@ -110,37 +118,48 @@ public class PesoShop implements Listener {
 
 			}
 
-		} else if (Main.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
-			if (!((Player) e.getWhoClicked()).getName()
-					.equals(((Shop) Main.shopConfig.get(Shop.getLoc(e.getInventory().getLocation()))).owner)) {
-				e.setCancelled(true);
-				return;
+		} else if (e.getInventory().getLocation() != null) {
+			if (e.getInventory().getType() == InventoryType.CHEST) {
+				if (plugin.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
+					if (!((Player) e.getWhoClicked()).getName().equals(
+							((Shop) plugin.shopConfig.get(Shop.getLoc(e.getInventory().getLocation()))).owner)) {
+						e.setCancelled(true);
+						return;
+					}
+				}
 			}
 		}
 	}
-	
+
 	@EventHandler
 	public void onInventoryDrag(final InventoryDragEvent e) {
 
-		if (Main.ADMINS.contains(e.getWhoClicked().getName())) {
+		if (plugin.ADMINS.contains(e.getWhoClicked().getName())) {
+			return;
+		}
+		if (e.getInventory().getLocation() == null) {
 			return;
 		}
 
 		String loc = Shop.getLoc(e.getInventory().getLocation());
 		if (e.getInventory().getType() == InventoryType.CHEST) {
-			if (Main.shopConfig.contains(loc)) {
-				if(((Shop)Main.shopConfig.get(loc)).owner != e.getWhoClicked().getName()) {
+			if (plugin.shopConfig.contains(loc)) {
+				if (((Shop) plugin.shopConfig.get(loc)).owner != e.getWhoClicked().getName()) {
 					e.setCancelled(true);
 				}
 			}
 		}
 	}
-	
+
 	@EventHandler
-	public static void onOpen(InventoryOpenEvent e) {
-		if (Main.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
+	public void onOpen(InventoryOpenEvent e) {
+		Location invLoc = e.getInventory().getLocation();
+		if (invLoc == null) {
+			return;
+		}
+		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
 			if (e.getInventory().getType() == InventoryType.CHEST) {
-				Shop shop = (Shop) Main.shopConfig.get(Shop.getLoc(e.getInventory().getLocation()));
+				Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
 				String msg = "You opened ";
 				HumanEntity h = e.getPlayer();
 				if (shop.owner.equalsIgnoreCase(h.getName())) {
@@ -149,7 +168,7 @@ public class PesoShop implements Listener {
 					msg += "§2§l" + shop.owner + "§r's shop";
 				}
 
-				if (Main.ADMINS.contains(h.getName())) {
+				if (plugin.ADMINS.contains(h.getName())) {
 					msg += " in §4§lADMIN OVERRIDE§r mode";
 				}
 				h.sendMessage(msg);
@@ -158,25 +177,25 @@ public class PesoShop implements Listener {
 	}
 
 	@EventHandler
-	public static void onHopper(InventoryMoveItemEvent e) {
-		if (Main.shopConfig.contains(Shop.getLoc(e.getSource().getLocation()))) {
+	public void onHopper(InventoryMoveItemEvent e) {
+		if (plugin.shopConfig.contains(Shop.getLoc(e.getSource().getLocation()))) {
 			e.setCancelled(true);
-		} else if (Main.shopConfig.contains(Shop.getLoc(e.getDestination().getLocation()))) {
+		} else if (plugin.shopConfig.contains(Shop.getLoc(e.getDestination().getLocation()))) {
 			e.setCancelled(true);
 		}
 	}
 
 	@EventHandler
-	public static void onEntityExplode(EntityExplodeEvent e) {
+	public void onEntityExplode(EntityExplodeEvent e) {
 		for (int i = 0; i < e.blockList().size(); i++) {
-			if (Main.shopConfig.contains(Shop.getLoc(e.blockList().get(i).getLocation()))) {
+			if (plugin.shopConfig.contains(Shop.getLoc(e.blockList().get(i).getLocation()))) {
 				e.blockList().remove(i);
 			}
 		}
 	}
 
 	@EventHandler
-	public static void onPlace(BlockPlaceEvent e) {
+	public void onPlace(BlockPlaceEvent e) {
 		Player p = e.getPlayer();
 		if (p == null) {
 			return;
@@ -203,15 +222,15 @@ public class PesoShop implements Listener {
 				} else {
 					e.getPlayer().sendMessage("You placed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
 							+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
-					Main.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
-					Main.saveShops();
+					plugin.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
+					plugin.saveShops();
 				}
 			}
 		}
 	}
 
 	@EventHandler
-	public static void onBreak(BlockBreakEvent e) {
+	public void onBreak(BlockBreakEvent e) {
 		if (e.getPlayer() == null) {
 			return;
 		}
@@ -220,19 +239,21 @@ public class PesoShop implements Listener {
 		}
 
 		String loc = Shop.getLoc(e.getBlock().getLocation());
-		if (Main.shopConfig.contains(loc)) {
-			Shop shop = (Shop) Main.shopConfig.get(loc);
+		if (plugin.shopConfig.contains(loc)) {
+			Shop shop = (Shop) plugin.shopConfig.get(loc);
 			String owner = shop.owner;
 			String player = e.getPlayer().getName();
 			if (player.equalsIgnoreCase(owner)) {
-				e.getPlayer().sendMessage("You " + ChatColor.RED + "removed " +  ChatColor.RESET + "your " + ChatColor.GREEN + shop.price + ChatColor.RESET + " peso PesoShop");
-				Main.shopConfig.set(loc, null);
-				Main.saveShops();
-			}
-			else if(Main.ADMINS.contains(player)){
-				e.getPlayer().sendMessage("You " + ChatColor.RED + "removed " +  ChatColor.GOLD + owner + ChatColor.RESET + "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET + " peso PesoShop using §4§lADMIN OVERRIDE");
-			}
-			else {
+				e.getPlayer().sendMessage("You " + ChatColor.RED + "removed " + ChatColor.RESET + "your "
+						+ ChatColor.GREEN + shop.price + ChatColor.RESET + " peso PesoShop");
+				plugin.shopConfig.set(loc, null);
+				plugin.saveShops();
+			} else if (plugin.ADMINS.contains(player)) {
+				e.getPlayer()
+						.sendMessage("You " + ChatColor.RED + "removed " + ChatColor.GOLD + owner + ChatColor.RESET
+								+ "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET
+								+ " peso PesoShop using §4§lADMIN OVERRIDE");
+			} else {
 				e.setCancelled(true);
 			}
 		}
