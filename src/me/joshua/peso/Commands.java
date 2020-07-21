@@ -22,7 +22,7 @@ import com.sun.istack.internal.NotNull;
 public class Commands implements CommandExecutor, TabCompleter {
 
 	private Main plugin;
-	private static final List<String> PESO = Arrays.asList("withdraw", "deposit", "balance");
+	private static final List<String> PESO = Arrays.asList("withdraw", "deposit", "balance", "helpbook");
 
 	public Commands(Main plugin) {
 		this.plugin = plugin;
@@ -235,9 +235,6 @@ public class Commands implements CommandExecutor, TabCompleter {
 		if (command.getName().equalsIgnoreCase("peso")) {
 			if (args.length == 1) {
 				StringUtil.copyPartialMatches(args[0], PESO, completions);
-				if(StringUtil.startsWithIgnoreCase("helpbook", args[0])) {
-					completions.add("helpbook");
-				}
 			} else if (args.length == 2) {
 				if (args[0].charAt(0) == 'w' || args[0].charAt(0) == 'W') {
 					completions.add(Integer.toString(plugin.bankConfig.getInt(sender.getName())));
