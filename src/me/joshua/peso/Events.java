@@ -201,15 +201,14 @@ public class Events implements Listener {
 		if (p == null) {
 			return;
 		}
-		if (e.getBlock().getType() != Material.CHEST) {
-			return;
-		}
 
 		Location loc = e.getBlock().getLocation();
 		ItemMeta meta = e.getItemInHand().getItemMeta();
 
 		if (meta.hasDisplayName()) {
-			if (meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			Bukkit.broadcastMessage(ChatColor.BLACK + meta.getDisplayName());
+			if (e.getBlock().getType() != Material.CHEST
+					&& meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
 				String toParse = meta.getDisplayName().substring(9);
 				int n = 0;
 				try {
@@ -233,6 +232,7 @@ public class Events implements Listener {
 						|| name.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())
 						|| name.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
 					e.setCancelled(true);
+				} else {
 				}
 			}
 		}
