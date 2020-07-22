@@ -1,9 +1,12 @@
 package me.joshua.peso;
 
+import java.util.logging.Level;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Chest;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -87,11 +90,11 @@ public class Events implements Listener {
 								plugin.bankConfig.set(p.getName(), money - shop.price);
 								Bukkit.getScheduler().runTask(plugin, task -> {
 									p.closeInventory();
-									if (current.hasItemMeta()) {
+									if (current.hasItemMeta() && current.getItemMeta().hasDisplayName()) {
 										p.sendMessage("You purchased " + current.getItemMeta().getDisplayName()
-												+ ChatColor.BLUE + " x" + current.getAmount() + " for "
-												+ ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
-												+ ChatColor.GOLD + shop.owner);
+												+ ChatColor.BLUE + " x" + current.getAmount() + ChatColor.RESET
+												+ " for " + ChatColor.GREEN + shop.price + ChatColor.RESET
+												+ " pesos from " + ChatColor.GOLD + shop.owner);
 									} else {
 										p.sendMessage("You purchased " + current.getType().toString() + ChatColor.BLUE
 												+ " x" + current.getAmount() + ChatColor.RESET + " for "
@@ -155,13 +158,35 @@ public class Events implements Listener {
 	@EventHandler
 	public void onOpen(InventoryOpenEvent e) {
 		Location invLoc = e.getInventory().getLocation();
+
 		if (invLoc == null) {
 			return;
 		}
 		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
 			if (e.getInventory().getType() == InventoryType.CHEST) {
+
 				Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
 				String msg = "You opened ";
+				boolean flag = false;
+				try {
+					int chestPrice = Integer.parseInt(e.getView().getTitle().substring(9));
+					if (chestPrice != shop.price) {
+						flag = true;
+					}
+				} catch (NumberFormatException exception) {
+					flag = true;
+				}
+
+				if (flag) {
+					Chest chest = (Chest) e.getInventory().getLocation().getBlock().getState();
+					chest.setCustomName("PesoShop " + shop.price);
+					chest.update();
+					e.setCancelled(true);
+					plugin.getLogger().log(Level.INFO, "Config and Chest desync fixed at " + Shop.getLoc(invLoc));
+					Bukkit.getScheduler().runTask(plugin, task -> {
+						e.getPlayer().openInventory(e.getInventory());
+					});
+				}
 				HumanEntity h = e.getPlayer();
 				if (shop.owner.equalsIgnoreCase(h.getName())) {
 					msg += "your own shop";
@@ -206,8 +231,7 @@ public class Events implements Listener {
 		ItemMeta meta = e.getItemInHand().getItemMeta();
 
 		if (meta.hasDisplayName()) {
-			Bukkit.broadcastMessage(ChatColor.BLACK + meta.getDisplayName());
-			if (e.getBlock().getType() != Material.CHEST
+			if (e.getBlock().getType() == Material.CHEST
 					&& meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
 				String toParse = meta.getDisplayName().substring(9);
 				int n = 0;
@@ -236,7 +260,6 @@ public class Events implements Listener {
 				}
 			}
 		}
-
 	}
 
 	@EventHandler
