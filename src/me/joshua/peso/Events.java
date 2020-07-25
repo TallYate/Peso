@@ -6,7 +6,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.block.Chest;
+import org.bukkit.block.Block;
+import org.bukkit.block.Container;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -33,123 +34,134 @@ public class Events implements Listener {
 
 	@EventHandler
 	public void onClick(InventoryClickEvent e) {
+		// return if fake slot
 		if (e.getSlot() < 0) {
 			return;
 		}
 
+		// return if admin override
 		if (plugin.ADMINS.contains(e.getWhoClicked().getName())) {
 			return;
 		}
 
+		// return if fake inventory
 		if (e.getInventory().getLocation() == null) {
 			return;
 		}
 
-		String loc = Shop.getLoc(e.getClickedInventory().getLocation());
-		if (e.getClickedInventory().getType() == InventoryType.CHEST) {
-			if (plugin.shopConfig.contains(loc)) {
-				Player p = (Player) e.getWhoClicked();
-				Shop shop = (Shop) plugin.shopConfig.get(loc);
-				int money = plugin.bankConfig.getInt(p.getName());
-				if (!p.getName().equals(shop.owner)) {
-					if (e.getWhoClicked() instanceof Player) {
-						boolean flag = true;
-						int i = 0;
-						if (money >= shop.price) {
-
-							ItemStack cheque;
-							if (shop.price > 64) {
-								cheque = new ItemStack(Material.PAPER);
-								ItemMeta meta = cheque.getItemMeta();
-								meta.setDisplayName("§l" + Integer.toString(shop.price));
-								cheque.setItemMeta(meta);
-							} else {
-								cheque = plugin.config.getItemStack("1");
-								cheque.setAmount(shop.price);
-							}
-
-							ItemStack[] pInv = p.getInventory().getStorageContents();
-							while (i < pInv.length && flag) {
-								if (pInv[i] == null) {
-									flag = false;
-								}
-								i++;
-							}
-							if (flag) {
-								Bukkit.getScheduler().runTask(plugin, task -> {
-									p.closeInventory();
-									p.sendMessage(ChatColor.RED + "You do not have enough inventory space");
-								});
-							} else {
-								p.getInventory().addItem(e.getCurrentItem());
-								ItemStack current = e.getCurrentItem();
-								if (current.getType() == Material.AIR) {
-									return;
-								}
-								e.setCurrentItem(cheque);
-								plugin.bankConfig.set(p.getName(), money - shop.price);
-								Bukkit.getScheduler().runTask(plugin, task -> {
-									p.closeInventory();
-									if (current.hasItemMeta() && current.getItemMeta().hasDisplayName()) {
-										p.sendMessage("You purchased " + current.getItemMeta().getDisplayName()
-												+ ChatColor.BLUE + " x" + current.getAmount() + ChatColor.RESET
-												+ " for " + ChatColor.GREEN + shop.price + ChatColor.RESET
-												+ " pesos from " + ChatColor.GOLD + shop.owner);
-									} else {
-										p.sendMessage("You purchased " + current.getType().toString() + ChatColor.BLUE
-												+ " x" + current.getAmount() + ChatColor.RESET + " for "
-												+ ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
-												+ ChatColor.GOLD + shop.owner);
-									}
-
-									p.sendMessage("Your new balance is " + ChatColor.GREEN
-											+ plugin.bankConfig.getInt(p.getName()) + ChatColor.RESET + " pesos");
-									plugin.saveBank();
-								});
-							}
-						} else {
-							Bukkit.getScheduler().runTask(plugin, task -> {
-								if (e.getCurrentItem().getType() != Material.AIR) {
-									p.closeInventory();
-									p.sendMessage(ChatColor.RED + "You do not have " + ChatColor.GREEN + shop.price
-											+ ChatColor.RED + " pesos");
-								}
-							});
-						}
-					}
-					e.setCancelled(true);
-				}
-
-			}
-
-		} else if (e.getInventory().getLocation() != null) {
-			if (e.getInventory().getType() == InventoryType.CHEST) {
-				if (plugin.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
-					if (!((Player) e.getWhoClicked()).getName().equals(
-							((Shop) plugin.shopConfig.get(Shop.getLoc(e.getInventory().getLocation()))).owner)) {
-						e.setCancelled(true);
-						return;
-					}
-				}
+		// prevent accidental shift clicking to shop
+		if (e.getClickedInventory().getType() == InventoryType.PLAYER && e.isShiftClick()) {
+			if (plugin.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
+				e.setCancelled(true);
 			}
 		}
+
+		// return if clicked inventory is not a shop
+		String loc = Shop.getLoc(e.getClickedInventory().getLocation());
+		if (!plugin.shopConfig.contains(loc)) {
+			return;
+		}
+
+		Player p = (Player) e.getWhoClicked();
+		Shop shop = (Shop) plugin.shopConfig.get(loc);
+		int money = plugin.bankConfig.getInt(p.getName());
+
+		// if player is not owner do shop things
+		if (!p.getName().equals(shop.owner)) {
+			if (money < shop.price) {
+				noMoneyMsgIfRealClick(e.getCurrentItem().getType(), p, shop.price);
+			} else {
+				ItemStack cheque = createCheque(shop.price);
+				boolean flag = isFull(p.getInventory().getStorageContents());
+				if (flag) {
+					Bukkit.getScheduler().runTask(plugin, task -> {
+						p.closeInventory();
+						p.sendMessage(ChatColor.RED + "You do not have enough inventory space");
+					});
+				} else {
+					ItemStack current = e.getCurrentItem();
+					if (current.getType() != Material.AIR) {
+						p.getInventory().addItem(current);
+						e.setCurrentItem(cheque);
+						plugin.bankConfig.set(p.getName(), money - shop.price);
+						purchaseMessage(p, current, shop);
+					}
+				}
+			}
+			e.setCancelled(true);
+		}
+	}
+
+	private boolean isFull(ItemStack[] inv) {
+		for (ItemStack stack : inv) {
+			if (stack == null) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private ItemStack createCheque(int price) {
+		ItemStack cheque;
+		if (price > 64) {
+			cheque = new ItemStack(Material.PAPER);
+			ItemMeta meta = cheque.getItemMeta();
+			meta.setDisplayName("§l" + Integer.toString(price));
+			cheque.setItemMeta(meta);
+		} else {
+			cheque = plugin.config.getItemStack("1");
+			cheque.setAmount(price);
+		}
+		return cheque;
+	}
+
+	private void noMoneyMsgIfRealClick(Material material, Player p, int money) {
+
+		if (material != Material.AIR) {
+
+			p.sendMessage(ChatColor.RED + "You do not have " + ChatColor.GREEN + money + ChatColor.RED + " pesos");
+			Bukkit.getScheduler().runTask(plugin, task -> {
+				p.closeInventory();
+			});
+		}
+	}
+
+	private void purchaseMessage(Player p, ItemStack stack, Shop shop) {
+		Bukkit.getScheduler().runTask(plugin, task -> {
+			p.closeInventory();
+		});
+		if (stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()) {
+			p.sendMessage("You purchased " + stack.getItemMeta().getDisplayName() + ChatColor.BLUE + " x"
+					+ stack.getAmount() + ChatColor.RESET + " for " + ChatColor.GREEN + shop.price + ChatColor.RESET
+					+ " pesos from " + ChatColor.GOLD + shop.owner);
+		} else {
+			p.sendMessage("You purchased " + stack.getType().toString() + ChatColor.BLUE + " x" + stack.getAmount()
+					+ ChatColor.RESET + " for " + ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
+					+ ChatColor.GOLD + shop.owner);
+		}
+
+		p.sendMessage("Your new balance is " + ChatColor.GREEN + plugin.bankConfig.getInt(p.getName()) + ChatColor.RESET
+				+ " pesos");
+		plugin.saveBank();
 	}
 
 	@EventHandler
 	public void onInventoryDrag(final InventoryDragEvent e) {
-
 		if (plugin.ADMINS.contains(e.getWhoClicked().getName())) {
 			return;
 		}
 		if (e.getInventory().getLocation() == null) {
 			return;
 		}
-
+		
 		String loc = Shop.getLoc(e.getInventory().getLocation());
-		if (e.getInventory().getType() == InventoryType.CHEST) {
-			if (plugin.shopConfig.contains(loc)) {
-				if (((Shop) plugin.shopConfig.get(loc)).owner != e.getWhoClicked().getName()) {
-					e.setCancelled(true);
+		if (plugin.shopConfig.contains(loc)) {
+			if (((Shop) plugin.shopConfig.get(loc)).owner != e.getWhoClicked().getName()) {
+				for(Integer slot : e.getRawSlots()) {
+					if(slot<e.getInventory().getSize()) {
+						e.setCancelled(true);
+						return;
+					}
 				}
 			}
 		}
@@ -162,43 +174,43 @@ public class Events implements Listener {
 		if (invLoc == null) {
 			return;
 		}
-		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
-			if (e.getInventory().getType() == InventoryType.CHEST) {
 
-				Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
-				String msg = "You opened ";
-				boolean flag = false;
-				try {
-					int chestPrice = Integer.parseInt(e.getView().getTitle().substring(9));
-					if (chestPrice != shop.price) {
-						flag = true;
-					}
-				} catch (NumberFormatException exception) {
+		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
+
+			Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
+
+			boolean flag = false;
+			try {
+				int containerPrice = Integer.parseInt(e.getView().getTitle().substring(9));
+				if (containerPrice != shop.price) {
 					flag = true;
 				}
-
-				if (flag) {
-					Chest chest = (Chest) e.getInventory().getLocation().getBlock().getState();
-					chest.setCustomName("PesoShop " + shop.price);
-					chest.update();
-					e.setCancelled(true);
-					plugin.getLogger().log(Level.INFO, "Config and Chest desync fixed at " + Shop.getLoc(invLoc));
-					Bukkit.getScheduler().runTask(plugin, task -> {
-						e.getPlayer().openInventory(e.getInventory());
-					});
-				}
-				HumanEntity h = e.getPlayer();
-				if (shop.owner.equalsIgnoreCase(h.getName())) {
-					msg += "your own shop";
-				} else {
-					msg += "§2§l" + shop.owner + "§r's shop";
-				}
-
-				if (plugin.ADMINS.contains(h.getName())) {
-					msg += " in §4§lADMIN OVERRIDE§r mode";
-				}
-				h.sendMessage(msg);
+			} catch (NumberFormatException exception) {
+				flag = true;
 			}
+
+			if (flag) {
+				Container container = (Container) e.getInventory().getLocation().getBlock().getState();
+				container.setCustomName("PesoShop " + shop.price);
+				container.update();
+				e.setCancelled(true);
+				plugin.getLogger().log(Level.INFO, "Config and Chest desync fixed at " + Shop.getLoc(invLoc));
+				Bukkit.getScheduler().runTask(plugin, task -> {
+					e.getPlayer().openInventory(e.getInventory());
+				});
+			}
+			String msg = "You opened ";
+			HumanEntity h = e.getPlayer();
+			if (shop.owner.equalsIgnoreCase(h.getName())) {
+				msg += "your own shop";
+			} else {
+				msg += "§2§l" + shop.owner + "§r's shop";
+			}
+
+			if (plugin.ADMINS.contains(h.getName())) {
+				msg += " in §4§lADMIN OVERRIDE§r mode";
+			}
+			h.sendMessage(msg);
 		}
 	}
 
@@ -227,39 +239,79 @@ public class Events implements Listener {
 			return;
 		}
 
-		Location loc = e.getBlock().getLocation();
-		ItemMeta meta = e.getItemInHand().getItemMeta();
+		Block block = e.getBlock();
 
-		if (meta.hasDisplayName()) {
-			if (e.getBlock().getType() == Material.CHEST
-					&& meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-				String toParse = meta.getDisplayName().substring(9);
-				int n = 0;
-				try {
-					n = Integer.parseInt(toParse);
-				} catch (NumberFormatException ex) {
-					e.getPlayer().sendMessage(ChatColor.RED + toParse + " is not a valid number");
-					return;
-				}
-				if (n < 1) {
-					e.getPlayer().sendMessage(ChatColor.RED + (n + " is not a valid number"));
-				} else {
-					e.getPlayer().sendMessage("You placed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
-							+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
-					plugin.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
-					plugin.saveShops();
-				}
-			} else {
-				String name = meta.getDisplayName();
-				if (name.equals(plugin.config.getItemStack("1").getItemMeta().getDisplayName())
-						|| name.equals(plugin.config.getItemStack("10").getItemMeta().getDisplayName())
-						|| name.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())
-						|| name.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
-					e.setCancelled(true);
-				} else {
-				}
+		ItemMeta meta = e.getItemInHand().getItemMeta();
+		if (!(block.getState() instanceof Container)) {
+			String name = meta.getDisplayName();
+			if (name.equals(plugin.config.getItemStack("1").getItemMeta().getDisplayName())
+					|| name.equals(plugin.config.getItemStack("10").getItemMeta().getDisplayName())
+					|| name.equals(plugin.config.getItemStack("20").getItemMeta().getDisplayName())
+					|| name.equals(plugin.config.getItemStack("50").getItemMeta().getDisplayName())) {
+				e.setCancelled(true);
+			}
+			return;
+		}
+
+		Location loc = e.getBlock().getLocation();
+
+		if (e.getBlock().getType() == Material.CHEST || e.getBlock().getType() == Material.TRAPPED_CHEST) {
+			Material type = e.getBlock().getType();
+			if (isNextTo(type, loc)
+					&& (meta.hasDisplayName() & meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")
+							| isNextToShopThatIs(type, loc))) {
+				e.setCancelled(true);
+				p.sendMessage(ChatColor.RED + "PesoShops cannot be double chests!");
+				return;
 			}
 		}
+
+		if (meta.hasDisplayName() && meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			String toParse = meta.getDisplayName().substring(9);
+			int n = 0;
+			try {
+				n = Integer.parseInt(toParse);
+			} catch (NumberFormatException ex) {
+				e.getPlayer().sendMessage(ChatColor.RED + toParse + " is not a valid number");
+				return;
+			}
+			if (n < 1) {
+				e.getPlayer().sendMessage(ChatColor.RED + (n + " is not a valid number"));
+			} else {
+				e.getPlayer().sendMessage("You placed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
+						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
+				plugin.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
+				plugin.saveShops();
+			}
+		}
+	}
+
+	private boolean isNextToShopThatIs(Material type, Location loc) {
+		if ((loc.clone().add(1, 0, 0).getBlock().getType() == type && isShop(loc.clone().add(1, 0, 0)))
+				|| (loc.clone().add(-1, 0, 0).getBlock().getType() == type && isShop(loc.clone().add(-1, 0, 0)))
+				|| (loc.clone().add(0, 0, 1).getBlock().getType() == type && isShop(loc.clone().add(0, 0, 1)))
+				|| (loc.clone().add(0, 0, -1).getBlock().getType() == type && isShop(loc.clone().add(0, 0, -1)))) {
+			return true;
+		}
+		return false;
+
+	}
+
+	public boolean isNextTo(Material type, Location loc) {
+		if (loc.clone().add(1, 0, 0).getBlock().getType() == type
+				|| loc.clone().add(-1, 0, 0).getBlock().getType() == type
+				|| loc.clone().add(0, 0, 1).getBlock().getType() == type
+				|| loc.clone().add(0, 0, -1).getBlock().getType() == type) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean isShop(Location loc) {
+		if (plugin.shopConfig.contains(Shop.getLoc(loc))) {
+			return true;
+		}
+		return false;
 	}
 
 	@EventHandler
@@ -290,7 +342,7 @@ public class Events implements Listener {
 		if (e.getPlayer() == null) {
 			return;
 		}
-		if (e.getBlock().getType() != Material.CHEST) {
+		if (!(e.getBlock().getState() instanceof Container)) {
 			return;
 		}
 
