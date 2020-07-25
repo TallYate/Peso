@@ -49,15 +49,8 @@ public class Events implements Listener {
 			return;
 		}
 
-		// prevent accidental shift clicking to shop
-		if (e.getClickedInventory().getType() == InventoryType.PLAYER && e.isShiftClick()) {
-			if (plugin.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
-				e.setCancelled(true);
-			}
-		}
-
-		// return if clicked inventory is not a shop
-		String loc = Shop.getLoc(e.getClickedInventory().getLocation());
+		// return if inventory is not a shop
+		String loc = Shop.getLoc(e.getInventory().getLocation());
 		if (!plugin.shopConfig.contains(loc)) {
 			return;
 		}
@@ -66,8 +59,20 @@ public class Events implements Listener {
 		Shop shop = (Shop) plugin.shopConfig.get(loc);
 		int money = plugin.bankConfig.getInt(p.getName());
 
-		// if player is not owner do shop things
-		if (!p.getName().equals(shop.owner)) {
+		// if the player is the owner, return
+		if (p.getName().equalsIgnoreCase(shop.owner)) {
+			return;
+		}
+
+		// prevent accidental shift clicking from player inventory to shop
+		if (e.getClickedInventory().getType() == InventoryType.PLAYER && e.isShiftClick()) {
+			if (plugin.shopConfig.contains(Shop.getLoc(e.getInventory().getLocation()))) {
+				e.setCancelled(true);
+			}
+		}
+
+		// if player is not clicking their own inventory do shop things
+		if (e.getInventory() == e.getClickedInventory()) {
 			if (money < shop.price) {
 				noMoneyMsgIfRealClick(e.getCurrentItem().getType(), p, shop.price);
 			} else {
@@ -153,15 +158,16 @@ public class Events implements Listener {
 		if (e.getInventory().getLocation() == null) {
 			return;
 		}
-		
+
 		String loc = Shop.getLoc(e.getInventory().getLocation());
 		if (plugin.shopConfig.contains(loc)) {
-			if (((Shop) plugin.shopConfig.get(loc)).owner != e.getWhoClicked().getName()) {
-				for(Integer slot : e.getRawSlots()) {
-					if(slot<e.getInventory().getSize()) {
-						e.setCancelled(true);
-						return;
-					}
+			if (((Shop) plugin.shopConfig.get(loc)).owner.equalsIgnoreCase(e.getWhoClicked().getName())) {
+				return;
+			}
+			for (Integer slot : e.getRawSlots()) {
+				if (slot < e.getInventory().getSize()) {
+					e.setCancelled(true);
+					return;
 				}
 			}
 		}
