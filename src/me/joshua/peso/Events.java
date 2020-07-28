@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -344,19 +345,27 @@ public class Events implements Listener {
 	}
 
 	@EventHandler
-	public void onBreak(BlockBreakEvent e) {
-		String loc = Shop.getLoc(e.getBlock().getLocation());
-		if (e.getPlayer() == null) {
-			if (plugin.shopConfig.contains(loc)) {
-				e.setCancelled(true);
+	public void onPiston(BlockPistonExtendEvent event) {
+		event.getBlocks().forEach(block -> {
+			String loc = Shop.getLoc(block.getLocation());
+			if(plugin.shopConfig.contains(loc)) {
+				event.setCancelled(true);
+				return;
 			}
+		});
+	}
+	
+	@EventHandler
+	public void onBreak(BlockBreakEvent e) {
+		if (e.getPlayer() == null) {
 			return;
 		}
 		
 		if (!(e.getBlock().getState() instanceof Container)) {
 			return;
 		}
-
+		
+		String loc = Shop.getLoc(e.getBlock().getLocation());
 		if (plugin.shopConfig.contains(loc)) {
 			Shop shop = (Shop) plugin.shopConfig.get(loc);
 			String owner = shop.owner;
