@@ -345,14 +345,18 @@ public class Events implements Listener {
 
 	@EventHandler
 	public void onBreak(BlockBreakEvent e) {
+		String loc = Shop.getLoc(e.getBlock().getLocation());
 		if (e.getPlayer() == null) {
+			if (plugin.shopConfig.contains(loc)) {
+				e.setCancelled(true);
+			}
 			return;
 		}
+		
 		if (!(e.getBlock().getState() instanceof Container)) {
 			return;
 		}
 
-		String loc = Shop.getLoc(e.getBlock().getLocation());
 		if (plugin.shopConfig.contains(loc)) {
 			Shop shop = (Shop) plugin.shopConfig.get(loc);
 			String owner = shop.owner;
