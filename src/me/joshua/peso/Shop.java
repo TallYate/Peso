@@ -18,6 +18,11 @@ public class Shop implements ConfigurationSerializable {
 		this.price = price;
 	}
 	
+	public Shop(String pName, int price) {
+		this.owner = pName;
+		this.price = price;
+	}
+	
 	public Shop(Map<String, Object> map) {
 		this.owner = (String) map.get("owner");
 		this.price = (int) map.get("price");

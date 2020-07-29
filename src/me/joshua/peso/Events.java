@@ -22,7 +22,9 @@ import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 
 public class Events implements Listener {
@@ -219,6 +221,39 @@ public class Events implements Listener {
 			}
 			h.sendMessage(msg);
 		}
+		
+		else if(e.getView().getTitle().length() > 8 && e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			String toParse = e.getView().getTitle().substring(9);
+			int n = 0;
+			try {
+				n = Integer.parseInt(toParse);
+			} catch (NumberFormatException ex) {
+				e.setCancelled(true);
+				markFake(e.getInventory(), e.getPlayer());
+				return;
+			}
+			if (n < 1) {
+				e.setCancelled(true);
+				markFake(e.getInventory(), e.getPlayer());
+			} else {
+				e.getPlayer().sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
+						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
+				plugin.shopConfig.set(Shop.getLoc(e.getInventory().getLocation()), new Shop(e.getPlayer().getName(), n));
+				plugin.saveShops();
+			}
+		}
+	}
+	
+	public void markFake(Inventory inventory, HumanEntity human) {
+		Container container = (Container)inventory.getLocation().getBlock().getState();
+		String name = container.getCustomName();
+		name = name.substring(4);
+		name = ChatColor.DARK_RED + "Fake" + name;
+		container.setCustomName(name);
+		container.update();
+		Bukkit.getScheduler().runTask(plugin, task -> {
+			human.openInventory(inventory);
+		});
 	}
 
 	@EventHandler
@@ -273,8 +308,16 @@ public class Events implements Listener {
 			}
 		}
 
-		if (meta.hasDisplayName() && meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-			String toParse = meta.getDisplayName().substring(9);
+		String name = null;
+
+		if (meta.hasDisplayName()) {
+			name = meta.getDisplayName();
+		} else if (meta instanceof BlockStateMeta) {
+			name = ((Container) ((BlockStateMeta) meta).getBlockState()).getCustomName();
+		}
+
+		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			String toParse = name.substring(9);
 			int n = 0;
 			try {
 				n = Integer.parseInt(toParse);
@@ -348,23 +391,23 @@ public class Events implements Listener {
 	public void onPiston(BlockPistonExtendEvent event) {
 		event.getBlocks().forEach(block -> {
 			String loc = Shop.getLoc(block.getLocation());
-			if(plugin.shopConfig.contains(loc)) {
+			if (plugin.shopConfig.contains(loc)) {
 				event.setCancelled(true);
 				return;
 			}
 		});
 	}
-	
+
 	@EventHandler
 	public void onBreak(BlockBreakEvent e) {
 		if (e.getPlayer() == null) {
 			return;
 		}
-		
+
 		if (!(e.getBlock().getState() instanceof Container)) {
 			return;
 		}
-		
+
 		String loc = Shop.getLoc(e.getBlock().getLocation());
 		if (plugin.shopConfig.contains(loc)) {
 			Shop shop = (Shop) plugin.shopConfig.get(loc);
