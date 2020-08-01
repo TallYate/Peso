@@ -242,14 +242,15 @@ public class Events implements Listener {
 				plugin.saveShops();
 			}
 		}
+		else if(e.getView().getTitle().length() == 8 && e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			e.setCancelled(true);
+			markFake(e.getInventory(), e.getPlayer());
+		}
 	}
 	
 	public void markFake(Inventory inventory, HumanEntity human) {
 		Container container = (Container)inventory.getLocation().getBlock().getState();
-		String name = container.getCustomName();
-		name = name.substring(4);
-		name = ChatColor.DARK_RED + "Fake" + name;
-		container.setCustomName(name);
+		container.setCustomName(ChatColor.DARK_RED + container.getCustomName());
 		container.update();
 		Bukkit.getScheduler().runTask(plugin, task -> {
 			human.openInventory(inventory);
@@ -317,6 +318,10 @@ public class Events implements Listener {
 		}
 
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			if(name.length() <= 9) {
+				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");
+				return;
+			}
 			String toParse = name.substring(9);
 			int n = 0;
 			try {

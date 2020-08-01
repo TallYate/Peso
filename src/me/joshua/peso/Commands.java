@@ -203,17 +203,20 @@ public class Commands implements CommandExecutor, TabCompleter {
 			p.sendMessage(ChatColor.RED + "You are not holding currency");
 			return;
 		}
-
-		int balance = plugin.bankConfig.getInt(p.getName()) + n;
-		plugin.bankConfig.set(p.getName(), balance);
+		int oldBalance = plugin.bankConfig.getInt(p.getName());
+		if(oldBalance<0) {
+			oldBalance*=-1;
+			plugin.bankConfig.set(p.getName(), oldBalance);
+		}
+		int newBalance = oldBalance + n;
+		if(newBalance<0) {
+			p.sendMessage(ChatColor.RED + "That will cause your bank to overflow! (max is 2,147,483,647)");
+			return;
+		}
+		plugin.bankConfig.set(p.getName(), newBalance);
 		hand.setAmount(0);
 		this.saveBank();
-		if (n == 1) {
-			p.sendMessage("§a1§r peso has been added to your balance. Your new balance is " + balance);
-		} else {
-			p.sendMessage(ChatColor.GREEN + Integer.toString(n) + ChatColor.RESET
-					+ " pesos have been added to your balance. Your new balance is " + balance);
-		}
+		p.sendMessage(ChatColor.GREEN.toString() + n + ChatColor.RESET + (n==1?" peso":" pesos") + " has been added to your balance. Your new balance is " + ChatColor.GREEN + newBalance);
 	}
 
 	public void saveStack(ItemStack stack, String s) {
