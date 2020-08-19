@@ -221,8 +221,9 @@ public class Events implements Listener {
 			}
 			h.sendMessage(msg);
 		}
-		
-		else if(e.getView().getTitle().length() > 8 && e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+
+		else if (e.getView().getTitle().length() > 8
+				&& e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			String toParse = e.getView().getTitle().substring(9);
 			int n = 0;
 			try {
@@ -238,18 +239,19 @@ public class Events implements Listener {
 			} else {
 				e.getPlayer().sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
 						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
-				plugin.shopConfig.set(Shop.getLoc(e.getInventory().getLocation()), new Shop(e.getPlayer().getName(), n));
+				plugin.shopConfig.set(Shop.getLoc(e.getInventory().getLocation()),
+						new Shop(e.getPlayer().getName(), n));
 				plugin.saveShops();
 			}
-		}
-		else if(e.getView().getTitle().length() == 8 && e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+		} else if (e.getView().getTitle().length() == 8
+				&& e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			e.setCancelled(true);
 			markFake(e.getInventory(), e.getPlayer());
 		}
 	}
-	
+
 	public void markFake(Inventory inventory, HumanEntity human) {
-		Container container = (Container)inventory.getLocation().getBlock().getState();
+		Container container = (Container) inventory.getLocation().getBlock().getState();
 		container.setCustomName(ChatColor.DARK_RED + container.getCustomName());
 		container.update();
 		Bukkit.getScheduler().runTask(plugin, task -> {
@@ -301,8 +303,8 @@ public class Events implements Listener {
 		if (e.getBlock().getType() == Material.CHEST || e.getBlock().getType() == Material.TRAPPED_CHEST) {
 			Material type = e.getBlock().getType();
 			if (isNextTo(type, loc)
-					&& (meta.hasDisplayName() & meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop")
-							| isNextToShopThatIs(type, loc))) {
+					&& ((meta.hasDisplayName() && meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop"))
+							|| isNextToShopThatIs(type, loc))) {
 				e.setCancelled(true);
 				p.sendMessage(ChatColor.RED + "PesoShops cannot be double chests!");
 				return;
@@ -318,7 +320,7 @@ public class Events implements Listener {
 		}
 
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
-			if(name.length() <= 9) {
+			if (name.length() <= 9) {
 				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");
 				return;
 			}
@@ -410,6 +412,11 @@ public class Events implements Listener {
 		}
 
 		if (!(e.getBlock().getState() instanceof Container)) {
+			String loc = Shop.getLoc(e.getBlock().getLocation());
+			if(plugin.shopConfig.contains(loc)){
+				Bukkit.broadcastMessage("test");
+				plugin.shopConfig.set(loc, null);
+			}
 			return;
 		}
 
