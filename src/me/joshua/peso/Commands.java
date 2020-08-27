@@ -78,9 +78,9 @@ public class Commands implements CommandExecutor, TabCompleter {
 				}
 			} else if (args[0].charAt(0) == 'w' || args[0].charAt(0) == 'W') {
 				if (args.length == 2) {
-					Withdraw(p, Integer.parseInt(args[0]), "1");
+					Withdraw(p, args[1], "1");
 				} else {
-					Withdraw(p, Integer.parseInt(args[0]), args[1]);
+					Withdraw(p, args[1], args[2]);
 				}
 			}
 
@@ -94,9 +94,9 @@ public class Commands implements CommandExecutor, TabCompleter {
 			}
 		} else if (command.getName().equalsIgnoreCase("withdraw")) {
 			if (args.length == 1) {
-				Withdraw(p, Integer.parseInt(args[0]), "1");
+				Withdraw(p, args[0], "1");
 			} else {
-				Withdraw(p, Integer.parseInt(args[0]), args[1]);
+				Withdraw(p, args[0], args[1]);
 			}
 		} else if (command.getName().equalsIgnoreCase("deposit")) {
 			Deposit(p);
@@ -104,14 +104,21 @@ public class Commands implements CommandExecutor, TabCompleter {
 			p.sendMessage(
 					"You have " + ChatColor.GREEN + plugin.bankConfig.getInt(p.getName()) + ChatColor.RESET + " pesos");
 		} else {
-			Bukkit.broadcastMessage("This is an error. Please report this to Josh");
+			Bukkit.broadcastMessage("This is an error. Please report this to TallYate");
 		}
 		return false;
 	}
 
-	public void Withdraw(Player p, int x, String denomination) {
+	public void Withdraw(Player p, String amount, String denomination) {
+		int x;
+		try {
+			x = Integer.parseInt(amount);
+		} catch (NumberFormatException e) {
+			p.sendMessage(ChatColor.GREEN.toString() + amount + ChatColor.RED + " is not a valid number");
+			return;
+		}
 		if (x <= 0) {
-			p.sendMessage(ChatColor.GREEN.toString() + x + ChatColor.RED + " is not a valid number");
+			p.sendMessage(ChatColor.GREEN.toString() + x + ChatColor.RED + " is not a valid amount");
 			return;
 		}
 		int bal = plugin.bankConfig.getInt(p.getName());
@@ -172,7 +179,6 @@ public class Commands implements CommandExecutor, TabCompleter {
 				int value = Integer.parseInt(name.substring(2));
 				int n = hand.getAmount() * value;
 				int balance = plugin.bankConfig.getInt(p.getName()) + n;
-				Bukkit.broadcastMessage(Integer.toString(balance));
 				plugin.bankConfig.set(p.getName(), balance);
 				hand.setAmount(0);
 				this.saveBank();
@@ -204,19 +210,20 @@ public class Commands implements CommandExecutor, TabCompleter {
 			return;
 		}
 		int oldBalance = plugin.bankConfig.getInt(p.getName());
-		if(oldBalance<0) {
-			oldBalance*=-1;
+		if (oldBalance < 0) {
+			oldBalance *= -1;
 			plugin.bankConfig.set(p.getName(), oldBalance);
 		}
 		int newBalance = oldBalance + n;
-		if(newBalance<0) {
+		if (newBalance < 0) {
 			p.sendMessage(ChatColor.RED + "That will cause your bank to overflow! (max is 2,147,483,647)");
 			return;
 		}
 		plugin.bankConfig.set(p.getName(), newBalance);
 		hand.setAmount(0);
 		this.saveBank();
-		p.sendMessage(ChatColor.GREEN.toString() + n + ChatColor.RESET + (n==1?" peso":" pesos") + " has been added to your balance. Your new balance is " + ChatColor.GREEN + newBalance);
+		p.sendMessage(ChatColor.GREEN.toString() + n + ChatColor.RESET + (n == 1 ? " peso" : " pesos")
+				+ " has been added to your balance. Your new balance is " + ChatColor.GREEN + newBalance);
 	}
 
 	public void saveStack(ItemStack stack, String s) {

@@ -12,6 +12,7 @@ import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -19,10 +20,10 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
-import org.bukkit.inventory.Inventory;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -48,10 +49,10 @@ public class Events implements Listener {
 		}
 
 		// return if fake inventory
-		if (e.getInventory().getLocation() == null) {
+		// essentials' /echest's inventory's holder is null so this extracheck fixes an error
+		if (e.getInventory().getHolder() == null || e.getInventory().getLocation() == null) {
 			return;
 		}
-
 		// return if inventory is not a shop
 		String loc = Shop.getLoc(e.getInventory().getLocation());
 		if (!plugin.shopConfig.contains(loc)) {
@@ -177,20 +178,36 @@ public class Events implements Listener {
 	}
 
 	@EventHandler
-	public void onOpen(InventoryOpenEvent e) {
-		Location invLoc = e.getInventory().getLocation();
+	public void onOpen(PlayerInteractEvent e) {
+		if (e.getHand() != EquipmentSlot.HAND || e.getAction() != Action.RIGHT_CLICK_BLOCK || e.getPlayer().isSneaking()
+				|| !(e.getClickedBlock().getState() instanceof Container)) {
+			return;
+		}
 
-		if (invLoc == null) {
+		Container container = (Container) e.getClickedBlock().getState();
+		Location invLoc = container.getLocation();
+
+		if (invLoc == null || container.getCustomName() == null) {
+			return;
+		}
+
+		if (container.getCustomName().length() < 8) {
 			return;
 		}
 
 		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
-
 			Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
 
+			// colorify real pesoshop as green
+			if (container.getCustomName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+				markColor(Integer.toString(shop.price), container, e.getPlayer(), ChatColor.DARK_GREEN.toString());
+				return;
+			}
+
+			// open colorified shop window if price doesn't match or price is not number
 			boolean flag = false;
 			try {
-				int containerPrice = Integer.parseInt(e.getView().getTitle().substring(9));
+				int containerPrice = Integer.parseInt(container.getCustomName().substring(11));
 				if (containerPrice != shop.price) {
 					flag = true;
 				}
@@ -199,14 +216,9 @@ public class Events implements Listener {
 			}
 
 			if (flag) {
-				Container container = (Container) e.getInventory().getLocation().getBlock().getState();
-				container.setCustomName("PesoShop " + shop.price);
-				container.update();
-				e.setCancelled(true);
 				plugin.getLogger().log(Level.INFO, "Config and Chest desync fixed at " + Shop.getLoc(invLoc));
-				Bukkit.getScheduler().runTask(plugin, task -> {
-					e.getPlayer().openInventory(e.getInventory());
-				});
+				e.setCancelled(true);
+				markColor(Integer.toString(shop.price), container, e.getPlayer(), ChatColor.DARK_GREEN.toString());
 			}
 			String msg = "You opened ";
 			HumanEntity h = e.getPlayer();
@@ -221,42 +233,43 @@ public class Events implements Listener {
 			}
 			h.sendMessage(msg);
 		}
+//		fix colorified shops that are not in config
+		else if (container.getCustomName().length() > 10
+				&& container.getCustomName().substring(0, 10).equalsIgnoreCase(ChatColor.DARK_GREEN + "PesoShop")) {
 
-		else if (e.getView().getTitle().length() > 8
-				&& e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-			String toParse = e.getView().getTitle().substring(9);
+			// this is just an extra check in case the number somehow became invalid
+			String toParse = container.getCustomName().substring(11);
 			int n = 0;
 			try {
 				n = Integer.parseInt(toParse);
 			} catch (NumberFormatException ex) {
-				e.setCancelled(true);
-				markFake(e.getInventory(), e.getPlayer());
+				markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
 				return;
 			}
 			if (n < 1) {
-				e.setCancelled(true);
-				markFake(e.getInventory(), e.getPlayer());
+				markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
+
+				//
 			} else {
 				e.getPlayer().sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
 						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
-				plugin.shopConfig.set(Shop.getLoc(e.getInventory().getLocation()),
-						new Shop(e.getPlayer().getName(), n));
+				plugin.shopConfig.set(Shop.getLoc(container.getLocation()), new Shop(e.getPlayer().getName(), n));
 				plugin.saveShops();
 			}
-		} else if (e.getView().getTitle().length() == 8
-				&& e.getView().getTitle().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-			e.setCancelled(true);
-			markFake(e.getInventory(), e.getPlayer());
+		}
+//		mark fake shops as red (shops not in config)
+		else if (container.getCustomName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
 		}
 	}
 
-	public void markFake(Inventory inventory, HumanEntity human) {
-		Container container = (Container) inventory.getLocation().getBlock().getState();
-		container.setCustomName(ChatColor.DARK_RED + container.getCustomName());
+	public void markColor(String price, Container container, HumanEntity human, String prepend) {
+		container.setCustomName(prepend + "PesoShop " + price);
 		container.update();
-		Bukkit.getScheduler().runTask(plugin, task -> {
-			human.openInventory(inventory);
-		});
+	}
+
+	public static boolean startsWth(String string, String with) {
+		return string.length() >= with.length() && string.substring(0, with.length()).equalsIgnoreCase(with);
 	}
 
 	@EventHandler
@@ -329,11 +342,11 @@ public class Events implements Listener {
 			try {
 				n = Integer.parseInt(toParse);
 			} catch (NumberFormatException ex) {
-				e.getPlayer().sendMessage(ChatColor.RED + toParse + " is not a valid number");
+				e.getPlayer().sendMessage(ChatColor.RED + toParse + " is not a valid integer number");
 				return;
 			}
 			if (n < 1) {
-				e.getPlayer().sendMessage(ChatColor.RED + (n + " is not a valid number"));
+				e.getPlayer().sendMessage(ChatColor.RED + (n + " is not a valid amount"));
 			} else {
 				e.getPlayer().sendMessage("You placed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
 						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
@@ -413,8 +426,7 @@ public class Events implements Listener {
 
 		if (!(e.getBlock().getState() instanceof Container)) {
 			String loc = Shop.getLoc(e.getBlock().getLocation());
-			if(plugin.shopConfig.contains(loc)){
-				Bukkit.broadcastMessage("test");
+			if (plugin.shopConfig.contains(loc)) {
 				plugin.shopConfig.set(loc, null);
 			}
 			return;
