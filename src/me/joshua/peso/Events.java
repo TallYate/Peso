@@ -25,14 +25,13 @@ import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 
 public class Events implements Listener {
 	private Main plugin;
 
-	public Events(Main pluginIn) {
-		plugin = pluginIn;
+	public Events(Main plugin) {
+		this.plugin = plugin;
 		Bukkit.getPluginManager().registerEvents(this, plugin);
 	}
 
@@ -49,7 +48,8 @@ public class Events implements Listener {
 		}
 
 		// return if fake inventory
-		// essentials' /echest's inventory's holder is null so this extracheck fixes an error
+		// essentials' /echest's inventory's holder is null so this extracheck fixes an
+		// error
 		if (e.getInventory().getHolder() == null || e.getInventory().getLocation() == null) {
 			return;
 		}
@@ -324,13 +324,13 @@ public class Events implements Listener {
 			}
 		}
 
-		String name = null;
-
-		if (meta.hasDisplayName()) {
-			name = meta.getDisplayName();
-		} else if (meta instanceof BlockStateMeta) {
-			name = ((Container) ((BlockStateMeta) meta).getBlockState()).getCustomName();
+		if (!(block.getState() instanceof Container)) {
+			return;
 		}
+
+		String name = ((Container) e.getBlock().getState()).getCustomName();
+
+		name = ((Container) block.getState()).getCustomName();
 
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			if (name.length() <= 9) {
@@ -452,5 +452,4 @@ public class Events implements Listener {
 			}
 		}
 	}
-
 }
