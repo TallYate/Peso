@@ -296,6 +296,7 @@ public class Events implements Listener {
 		if (p == null) {
 			return;
 		}
+
 		Block block = e.getBlock();
 
 		ItemMeta meta = e.getItemInHand().getItemMeta();
@@ -328,16 +329,9 @@ public class Events implements Listener {
 		}
 
 		String name = ((Container) e.getBlock().getState()).getCustomName();
-		Bukkit.broadcastMessage(name);
+
 		name = ((Container) block.getState()).getCustomName();
-		
-		if(name.length()<5) {
-			return;
-		}
-		if(name.substring(0,2).equals(ChatColor.DARK_GREEN.toString())) {
-			name = name.substring(2);
-		}
-		
+
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			if (name.length() <= 9) {
 				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");
