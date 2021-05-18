@@ -19,13 +19,13 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.util.Vector;
 
 public class Events implements Listener {
 	private Main plugin;
@@ -273,15 +273,6 @@ public class Events implements Listener {
 	}
 
 	@EventHandler
-	public void onHopper(InventoryMoveItemEvent e) {
-		if (plugin.shopConfig.contains(Shop.getLoc(e.getSource().getLocation()))) {
-			e.setCancelled(true);
-		} else if (plugin.shopConfig.contains(Shop.getLoc(e.getDestination().getLocation()))) {
-			e.setCancelled(true);
-		}
-	}
-
-	@EventHandler
 	public void onEntityExplode(EntityExplodeEvent e) {
 		for (int i = 0; i < e.blockList().size(); i++) {
 			if (plugin.shopConfig.contains(Shop.getLoc(e.blockList().get(i).getLocation()))) {
@@ -290,6 +281,9 @@ public class Events implements Listener {
 		}
 	}
 
+	
+	private static final Vector[] POSSIBLE_HOPPERS = {new Vector(0, 1, 0), new Vector(1, 0, 0), new Vector(-1, 0, 0), new Vector(0, 0, 1), new Vector(0, 0, -1)};
+	
 	@EventHandler
 	public void onPlace(BlockPlaceEvent e) {
 		Player p = e.getPlayer();
@@ -299,6 +293,8 @@ public class Events implements Listener {
 
 		Block block = e.getBlock();
 
+		//	prevent accidental money loss by placing money
+		//	the stacks are weird so this is used
 		ItemMeta meta = e.getItemInHand().getItemMeta();
 		if (!(block.getState() instanceof Container)) {
 			String name = meta.getDisplayName();
@@ -313,6 +309,7 @@ public class Events implements Listener {
 
 		Location loc = e.getBlock().getLocation();
 
+		//	prevent stealing by turning a shop into a double chest
 		if (e.getBlock().getType() == Material.CHEST || e.getBlock().getType() == Material.TRAPPED_CHEST) {
 			Material type = e.getBlock().getType();
 			if (isNextTo(type, loc)
@@ -331,7 +328,31 @@ public class Events implements Listener {
 		String name = ((Container) e.getBlock().getState()).getCustomName();
 
 		name = ((Container) block.getState()).getCustomName();
-
+		
+		for(Vector vec : POSSIBLE_HOPPERS) {
+			//TODO check if the hopper is facing the chest
+			//	check for hopper shop
+			Location hopperShop = loc.add(vec);
+			if (hopperShop.getBlock().getType() == Material.HOPPER && plugin.shopConfig.contains(Shop.getLoc(hopperShop))) {
+				// A container is being placed under a hopper shop
+				Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(hopperShop));
+				String player = p.getName();
+				String owner = shop.owner;
+				if (! player.equalsIgnoreCase(owner)) {
+					if(plugin.ADMINS.contains(player)) {
+						p.sendMessage("You placed a container under" + ChatColor.GOLD + owner + ChatColor.RESET
+										+ "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET
+										+ " Hopper PesoShop using §4§lADMIN OVERRIDE");
+					}
+					else {
+						e.setCancelled(true);
+					}
+				}
+			}
+		}
+		
+		
+		//	placing a shop
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			if (name.length() <= 9) {
 				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");

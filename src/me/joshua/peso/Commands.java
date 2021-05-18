@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -16,8 +18,6 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.StringUtil;
-
-import com.sun.istack.internal.NotNull;
 
 public class Commands implements CommandExecutor, TabCompleter {
 
@@ -35,8 +35,7 @@ public class Commands implements CommandExecutor, TabCompleter {
 		plugin.getCommand("withdraw").setTabCompleter(this);
 	}
 
-	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label,
-			@NotNull String[] args) {
+	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 		if (!(sender instanceof Player)) {
 			sender.sendMessage("Only players may execute this command!");
 			return true;
@@ -79,12 +78,10 @@ public class Commands implements CommandExecutor, TabCompleter {
 			} else if (args[0].charAt(0) == 'w' || args[0].charAt(0) == 'W') {
 				if (args.length == 2) {
 					Withdraw(p, args[1], "1");
-				} else {
+				} else if (args.length > 2) {
 					Withdraw(p, args[1], args[2]);
 				}
-			}
-
-			else if (args[0].charAt(0) == 'd' || args[0].charAt(0) == 'D') {
+			} else if (args[0].charAt(0) == 'd' || args[0].charAt(0) == 'D') {
 				Deposit(p);
 			}
 
@@ -95,7 +92,7 @@ public class Commands implements CommandExecutor, TabCompleter {
 		} else if (command.getName().equalsIgnoreCase("withdraw")) {
 			if (args.length == 1) {
 				Withdraw(p, args[0], "1");
-			} else {
+			} else if (args.length > 1) {
 				Withdraw(p, args[0], args[1]);
 			}
 		} else if (command.getName().equalsIgnoreCase("deposit")) {
