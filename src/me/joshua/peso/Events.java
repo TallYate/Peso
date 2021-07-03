@@ -7,7 +7,9 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
+import org.bukkit.block.data.Directional;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -178,7 +180,7 @@ public class Events implements Listener {
 	}
 
 	@EventHandler
-	public void onOpen(PlayerInteractEvent e) {
+	public void onPlayerInteract(PlayerInteractEvent e) {
 		if (e.getHand() != EquipmentSlot.HAND || e.getAction() != Action.RIGHT_CLICK_BLOCK || e.getPlayer().isSneaking()
 				|| !(e.getClickedBlock().getState() instanceof Container)) {
 			return;
@@ -187,20 +189,15 @@ public class Events implements Listener {
 		Container container = (Container) e.getClickedBlock().getState();
 		Location invLoc = container.getLocation();
 
-		if (invLoc == null || container.getCustomName() == null) {
+		if (invLoc == null || container.getCustomName() == null || container.getCustomName().length() < 8) {
 			return;
 		}
-
-		if (container.getCustomName().length() < 8) {
-			return;
-		}
-
+		
 		if (plugin.shopConfig.contains(Shop.getLoc(invLoc))) {
 			Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(invLoc));
-
 			// colorify real pesoshop as green
 			if (container.getCustomName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-				markColor(Integer.toString(shop.price), container, e.getPlayer(), ChatColor.DARK_GREEN.toString());
+				markChestShop(Integer.toString(shop.price), container, ChatColor.DARK_GREEN);
 				return;
 			}
 
@@ -218,7 +215,7 @@ public class Events implements Listener {
 			if (flag) {
 				plugin.getLogger().log(Level.INFO, "Config and Chest desync fixed at " + Shop.getLoc(invLoc));
 				e.setCancelled(true);
-				markColor(Integer.toString(shop.price), container, e.getPlayer(), ChatColor.DARK_GREEN.toString());
+				markChestShop(Integer.toString(shop.price), container, ChatColor.DARK_GREEN);
 			}
 			String msg = "You opened ";
 			HumanEntity h = e.getPlayer();
@@ -233,37 +230,49 @@ public class Events implements Listener {
 			}
 			h.sendMessage(msg);
 		}
-//		fix colorified shops that are not in config
-		else if (container.getCustomName().length() > 10
-				&& container.getCustomName().substring(0, 10).equalsIgnoreCase(ChatColor.DARK_GREEN + "PesoShop")) {
-
-			// this is just an extra check in case the number somehow became invalid
+		else if (container.getCustomName().length() > 10 && container.getCustomName().substring(0, 10).equalsIgnoreCase(ChatColor.DARK_GREEN + "PesoShop")) {
+			tryClaim(container, e.getPlayer());
+			
+		}
+//		mark fake shops as red (shops not in config)
+		else if (container.getCustomName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
+			markInvalid(container);
+		}
+	}
+	
+	/**
+	 * Tries to claim a container if it has a valid price, otherwise the container will be invalidated
+	 * @param container the container to try to claim or invalidate
+	 */
+	private void tryClaim(Container container, Player player) {
+			// by setting them INVALID or by claiming them
 			String toParse = container.getCustomName().substring(11);
 			int n = 0;
 			try {
 				n = Integer.parseInt(toParse);
 			} catch (NumberFormatException ex) {
-				markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
+				markInvalid(container);
 				return;
 			}
 			if (n < 1) {
-				markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
-
-				//
+				markInvalid(container);
 			} else {
-				e.getPlayer().sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
+				player.sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
 						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
-				plugin.shopConfig.set(Shop.getLoc(container.getLocation()), new Shop(e.getPlayer().getName(), n));
+				plugin.shopConfig.set(Shop.getLoc(container.getLocation()), new Shop(player.getName(), n));
 				plugin.saveShops();
 			}
-		}
-//		mark fake shops as red (shops not in config)
-		else if (container.getCustomName().substring(0, 8).equalsIgnoreCase("PesoShop")) {
-			markColor("INVALID", container, e.getPlayer(), ChatColor.DARK_RED.toString());
-		}
 	}
-
-	public void markColor(String price, Container container, HumanEntity human, String prepend) {
+	
+	private void markInvalid(Container container) {
+		markChestShop("INVALID", container, ChatColor.DARK_RED);
+	}
+	
+	private void markChestShop(String price, Container container, ChatColor prepend) {
+		markChestShop(price, container, prepend.toString());
+	}
+	
+	private void markChestShop(String price, Container container, String prepend) {
 		container.setCustomName(prepend + "PesoShop " + price);
 		container.update();
 	}
@@ -283,7 +292,6 @@ public class Events implements Listener {
 
 	
 	private static final Vector[] POSSIBLE_HOPPERS = {new Vector(0, 1, 0), new Vector(1, 0, 0), new Vector(-1, 0, 0), new Vector(0, 0, 1), new Vector(0, 0, -1)};
-	
 	@EventHandler
 	public void onPlace(BlockPlaceEvent e) {
 		Player p = e.getPlayer();
@@ -329,23 +337,31 @@ public class Events implements Listener {
 
 		name = ((Container) block.getState()).getCustomName();
 		
+//		prevent stealing by turning placing a container under a hopper shop
 		for(Vector vec : POSSIBLE_HOPPERS) {
-			//TODO check if the hopper is facing the chest
 			//	check for hopper shop
-			Location hopperShop = loc.add(vec);
+			Location hopperShop = sum(loc, vec);
 			if (hopperShop.getBlock().getType() == Material.HOPPER && plugin.shopConfig.contains(Shop.getLoc(hopperShop))) {
-				// A container is being placed under a hopper shop
+				// A container is being placed near a hopper shop
 				Shop shop = (Shop) plugin.shopConfig.get(Shop.getLoc(hopperShop));
-				String player = p.getName();
-				String owner = shop.owner;
-				if (! player.equalsIgnoreCase(owner)) {
-					if(plugin.ADMINS.contains(player)) {
-						p.sendMessage("You placed a container under" + ChatColor.GOLD + owner + ChatColor.RESET
-										+ "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET
-										+ " Hopper PesoShop using §4§lADMIN OVERRIDE");
-					}
-					else {
-						e.setCancelled(true);
+				
+				// Check if the shop is facing the new container
+				BlockFace face = ((Directional) hopperShop.getBlock().getBlockData()).getFacing();
+				Vector mod = new Vector(face.getModX(), face.getModY(), face.getModZ());
+				if(sum(hopperShop, mod).equals(loc)) {
+					String player = p.getName();
+					String owner = shop.owner;
+					if (! player.equalsIgnoreCase(owner)) {
+						if(plugin.ADMINS.contains(player)) {
+							p.sendMessage("You placed a container under" + ChatColor.GOLD + owner + ChatColor.RESET
+											+ "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET
+											+ " Hopper PesoShop using §4§lADMIN OVERRIDE");
+						}
+						else {
+							p.sendMessage(ChatColor.RED + "You cannot place a container under a different player's hopper chest!");
+							e.setCancelled(true);
+							return;
+						}
 					}
 				}
 			}
@@ -358,10 +374,10 @@ public class Events implements Listener {
 				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");
 				return;
 			}
-			String toParse = name.substring(9);
+			String toParse = name.substring(8);
 			int n = 0;
 			try {
-				n = Integer.parseInt(toParse);
+				n = Integer.parseInt(toParse.trim());
 			} catch (NumberFormatException ex) {
 				e.getPlayer().sendMessage(ChatColor.RED + toParse + " is not a valid integer number");
 				return;
@@ -388,7 +404,7 @@ public class Events implements Listener {
 
 	}
 
-	public boolean isNextTo(Material type, Location loc) {
+	private boolean isNextTo(Material type, Location loc) {
 		if (loc.clone().add(1, 0, 0).getBlock().getType() == type
 				|| loc.clone().add(-1, 0, 0).getBlock().getType() == type
 				|| loc.clone().add(0, 0, 1).getBlock().getType() == type
@@ -472,5 +488,17 @@ public class Events implements Listener {
 				e.setCancelled(true);
 			}
 		}
+	}
+	
+	@SuppressWarnings("unused")
+	private Location sum(Location a, Location b) {
+		if(a.getWorld() != b.getWorld()) {
+			plugin.getLogger().severe("Locations a and b are in different worlds (bad!)");
+		}
+		return sum(a, b.toVector());
+	}
+	
+	private Location sum(Location loc, Vector vec) {
+		return new Location(loc.getWorld(), loc.getX() + vec.getX(), loc.getY() + vec.getY(), loc.getZ() + vec.getZ());
 	}
 }
