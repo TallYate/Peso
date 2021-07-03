@@ -10,7 +10,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.Directional;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -30,9 +29,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Vector;
 
 public class Events implements Listener {
-	private Main plugin;
+	private PesoPlugin plugin;
 
-	public Events(Main plugin) {
+	public Events(PesoPlugin plugin) {
 		this.plugin = plugin;
 		Bukkit.getPluginManager().registerEvents(this, plugin);
 	}
@@ -50,7 +49,7 @@ public class Events implements Listener {
 		}
 
 		// return if fake inventory
-		// essentials' /echest's inventory's holder is null so this extracheck fixes an
+		// essentials' /echest's inventory's holder is null so this extra check fixes an
 		// error
 		if (e.getInventory().getHolder() == null || e.getInventory().getLocation() == null) {
 			return;
@@ -80,14 +79,19 @@ public class Events implements Listener {
 		// if player is not clicking their own inventory do shop things
 		if (e.getInventory() == e.getClickedInventory()) {
 			if (money < shop.price) {
-				noMoneyMsgIfRealClick(e.getCurrentItem().getType(), p, shop.price);
+				if (e.getCurrentItem().getType() != Material.AIR) {
+					Msg.cantAfford(p, shop);
+					Bukkit.getScheduler().runTask(plugin, task -> {
+						p.closeInventory();
+					});
+				}
 			} else {
 				ItemStack cheque = createCheque(shop.price);
 				boolean flag = isFull(p.getInventory().getStorageContents());
 				if (flag) {
 					Bukkit.getScheduler().runTask(plugin, task -> {
 						p.closeInventory();
-						p.sendMessage(ChatColor.RED + "You do not have enough inventory space");
+						Msg.noInventorySpace(p);
 					});
 				} else {
 					ItemStack current = e.getCurrentItem();
@@ -126,33 +130,14 @@ public class Events implements Listener {
 		return cheque;
 	}
 
-	private void noMoneyMsgIfRealClick(Material material, Player p, int money) {
-
-		if (material != Material.AIR) {
-
-			p.sendMessage(ChatColor.RED + "You do not have " + ChatColor.GREEN + money + ChatColor.RED + " pesos");
-			Bukkit.getScheduler().runTask(plugin, task -> {
-				p.closeInventory();
-			});
-		}
-	}
 
 	private void purchaseMessage(Player p, ItemStack stack, Shop shop) {
 		Bukkit.getScheduler().runTask(plugin, task -> {
 			p.closeInventory();
 		});
-		if (stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()) {
-			p.sendMessage("You purchased " + stack.getItemMeta().getDisplayName() + ChatColor.BLUE + " x"
-					+ stack.getAmount() + ChatColor.RESET + " for " + ChatColor.GREEN + shop.price + ChatColor.RESET
-					+ " pesos from " + ChatColor.GOLD + shop.owner);
-		} else {
-			p.sendMessage("You purchased " + stack.getType().toString() + ChatColor.BLUE + " x" + stack.getAmount()
-					+ ChatColor.RESET + " for " + ChatColor.GREEN + shop.price + ChatColor.RESET + " pesos from "
-					+ ChatColor.GOLD + shop.owner);
-		}
+		Msg.purchasedStack(p, stack, shop);
 
-		p.sendMessage("Your new balance is " + ChatColor.GREEN + plugin.bankConfig.getInt(p.getName()) + ChatColor.RESET
-				+ " pesos");
+		Msg.newBalance(p, plugin);
 		plugin.saveBank();
 	}
 
@@ -217,18 +202,7 @@ public class Events implements Listener {
 				e.setCancelled(true);
 				markChestShop(Integer.toString(shop.price), container, ChatColor.DARK_GREEN);
 			}
-			String msg = "You opened ";
-			HumanEntity h = e.getPlayer();
-			if (shop.owner.equalsIgnoreCase(h.getName())) {
-				msg += "your own shop";
-			} else {
-				msg += "§2§l" + shop.owner + "§r's shop";
-			}
-
-			if (plugin.ADMINS.contains(h.getName())) {
-				msg += " in §4§lADMIN OVERRIDE§r mode";
-			}
-			h.sendMessage(msg);
+			Msg.openedShop(e.getPlayer(), shop, plugin);
 		}
 		else if (container.getCustomName().length() > 10 && container.getCustomName().substring(0, 10).equalsIgnoreCase(ChatColor.DARK_GREEN + "PesoShop")) {
 			tryClaim(container, e.getPlayer());
@@ -257,8 +231,7 @@ public class Events implements Listener {
 			if (n < 1) {
 				markInvalid(container);
 			} else {
-				player.sendMessage("You claimed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
-						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
+				Msg.claimedShop(player, n);
 				plugin.shopConfig.set(Shop.getLoc(container.getLocation()), new Shop(player.getName(), n));
 				plugin.saveShops();
 			}
@@ -324,7 +297,7 @@ public class Events implements Listener {
 					&& ((meta.hasDisplayName() && meta.getDisplayName().substring(0, 8).equalsIgnoreCase("PesoShop"))
 							|| isNextToShopThatIs(type, loc))) {
 				e.setCancelled(true);
-				p.sendMessage(ChatColor.RED + "PesoShops cannot be double chests!");
+				Msg.noDoubleChest(p);
 				return;
 			}
 		}
@@ -358,7 +331,7 @@ public class Events implements Listener {
 											+ " Hopper PesoShop using §4§lADMIN OVERRIDE");
 						}
 						else {
-							p.sendMessage(ChatColor.RED + "You cannot place a container under a different player's hopper chest!");
+							Msg.noHopperSteal(p);
 							e.setCancelled(true);
 							return;
 						}
@@ -371,7 +344,7 @@ public class Events implements Listener {
 		//	placing a shop
 		if (name != null && name.substring(0, 8).equalsIgnoreCase("PesoShop")) {
 			if (name.length() <= 9) {
-				e.getPlayer().sendMessage(ChatColor.RED + "You did not specify a price!");
+				Msg.priceNotSpecified(p);
 				return;
 			}
 			String toParse = name.substring(8);
@@ -383,10 +356,9 @@ public class Events implements Listener {
 				return;
 			}
 			if (n < 1) {
-				e.getPlayer().sendMessage(ChatColor.RED + (n + " is not a valid amount"));
+				Msg.err(p, n + " is not a valid amount");
 			} else {
-				e.getPlayer().sendMessage("You placed a " + ChatColor.GOLD + "PesoShop" + ChatColor.RESET
-						+ " with a price of " + ChatColor.GREEN + n + ChatColor.RESET + " pesos per slot");
+				Msg.placedShop(p, n);
 				plugin.shopConfig.set(Shop.getLoc(loc), new Shop(p, n));
 				plugin.saveShops();
 			}
@@ -475,15 +447,11 @@ public class Events implements Listener {
 			String owner = shop.owner;
 			String player = e.getPlayer().getName();
 			if (player.equalsIgnoreCase(owner)) {
-				e.getPlayer().sendMessage("You " + ChatColor.RED + "removed " + ChatColor.RESET + "your "
-						+ ChatColor.GREEN + shop.price + ChatColor.RESET + " peso PesoShop");
+				Msg.removedShop(e.getPlayer(), shop);
 				plugin.shopConfig.set(loc, null);
 				plugin.saveShops();
 			} else if (plugin.ADMINS.contains(player)) {
-				e.getPlayer()
-						.sendMessage("You " + ChatColor.RED + "removed " + ChatColor.GOLD + owner + ChatColor.RESET
-								+ "'s " + ChatColor.GREEN + shop.price + ChatColor.RESET
-								+ " peso PesoShop using §4§lADMIN OVERRIDE");
+				Msg.removedShopAdmin(e.getPlayer(), owner, shop);
 			} else {
 				e.setCancelled(true);
 			}

@@ -16,7 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 
-public class Main extends JavaPlugin {
+public class PesoPlugin extends JavaPlugin {
 	public FileConfiguration config = this.getConfig();
 	public File bankFile;
 	public FileConfiguration bankConfig;

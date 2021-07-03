@@ -19,10 +19,10 @@ import org.bukkit.util.StringUtil;
 
 public class Commands implements CommandExecutor, TabCompleter {
 
-	private Main plugin;
+	private PesoPlugin plugin;
 	private static final List<String> PESO = Arrays.asList("withdraw", "deposit", "balance", "helpbook");
 
-	public Commands(Main plugin) {
+	public Commands(PesoPlugin plugin) {
 		this.plugin = plugin;
 		plugin.getCommand("peso").setExecutor(this);
 		plugin.getCommand("withdraw").setExecutor(this);

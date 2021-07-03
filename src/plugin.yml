@@ -1,4 +1,4 @@
-main: me.joshua.peso.Main
+main: me.joshua.peso.PesoPlugin
 name: Pesos
 author: Joshua
 version: 6.2
